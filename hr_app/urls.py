@@ -1,0 +1,30 @@
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views
+
+router = DefaultRouter()
+router.register(r'employees', views.EmployeeViewSet)
+router.register(r'attendance', views.AttendanceViewSet)
+router.register(r'payroll', views.PayrollViewSet)
+router.register(r'job-postings', views.JobPostingViewSet)
+router.register(r'candidates', views.CandidateViewSet)
+router.register(r'benefits', views.BenefitViewSet)
+router.register(r'employee-benefits', views.EmployeeBenefitViewSet)
+router.register(r'expenses', views.ExpenseViewSet)
+router.register(r'projects', views.ProjectViewSet)
+router.register(r'tasks', views.TaskViewSet)
+router.register(r'performance-reviews', views.PerformanceReviewViewSet)
+router.register(r'courses', views.CourseViewSet)
+router.register(r'enrollments', views.EnrollmentViewSet)
+router.register(r'tax-records', views.TaxRecordViewSet)
+router.register(r'budgets', views.BudgetViewSet)
+router.register(r'users', views.UserViewSet)
+
+urlpatterns = [
+    path('auth/login/', views.login_view, name='login'),
+    path('auth/register/', views.register_view, name='register'),
+    path('auth/change-password/', views.change_password, name='change-password'),
+    path('auth/update-profile/', views.update_profile, name='update-profile'),
+    path('dashboard/stats/', views.dashboard_stats, name='dashboard-stats'),
+    path('', include(router.urls)),
+]
