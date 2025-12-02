@@ -8,7 +8,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import {
   Users,
   Search,
@@ -45,6 +45,8 @@ interface Employee {
   salary: string;
   phone: string;
   address: string;
+  onboarding_status: string;
+  onboarding_completed_date?: string;
 }
 
 interface Task {
@@ -53,6 +55,7 @@ interface Task {
   status: string;
   priority: string;
   due_date: string;
+  assigned_to: number;
   assigned_to_name: string;
   project_name: string;
 }
@@ -72,6 +75,7 @@ interface PayrollRecord {
   period_end: string;
   net_salary: string;
   status: string;
+  employee: number;
   employee_name: string;
 }
 
@@ -231,6 +235,72 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
     }
   };
 
+  const updateOnboardingStatus = async (employeeId: number, status: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/employees/${employeeId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          onboarding_status: status,
+          onboarding_completed_date: status === 'completed' ? new Date().toISOString() : null
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`Onboarding status updated to ${status.replace('_', ' ')}`);
+        // Refresh employees list
+        const employeesRes = await fetch('/api/employees/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (employeesRes.ok) {
+          setEmployees(await employeesRes.json());
+        }
+      } else {
+        toast.error('Failed to update onboarding status');
+      }
+    } catch (error) {
+      console.error('Error updating onboarding status:', error);
+      toast.error('Failed to update onboarding status');
+    }
+  };
+
+  const processPayroll = async (payrollId: number, status: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/payroll/${payrollId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: status,
+          processed_date: status === 'processed' ? new Date().toISOString() : undefined
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`Payroll ${status} successfully`);
+        // Refresh payroll records
+        const payrollRes = await fetch('/api/payroll/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (payrollRes.ok) {
+          setPayrollRecords(await payrollRes.json());
+        }
+      } else {
+        toast.error(`Failed to ${status} payroll`);
+      }
+    } catch (error) {
+      console.error(`Error ${status}ing payroll:`, error);
+      toast.error(`Failed to ${status} payroll`);
+    }
+  };
+
   const getEmployeeStats = (employeeId: number) => {
     const employeeTasks = tasks.filter(t => t.assigned_to === employeeId);
     const completedTasks = employeeTasks.filter(t => t.status === 'completed').length;
@@ -296,7 +366,7 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
               Add Employee
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[75vh] overflow-y-auto w-full sm:max-w-2xl mx-4 my-8">
             <DialogHeader>
               <DialogTitle>Add New Employee</DialogTitle>
             </DialogHeader>
@@ -347,7 +417,7 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
-                  <Select value={newEmployee.role} onValueChange={(value) => setNewEmployee({...newEmployee, role: value})}>
+                  <Select value={newEmployee.role} onValueChange={(value: string) => setNewEmployee({...newEmployee, role: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -440,6 +510,7 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
       <Tabs defaultValue="employees" className="space-y-6">
         <TabsList>
           <TabsTrigger value="employees">Employees</TabsTrigger>
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="tasks">Task Overview</TabsTrigger>
           <TabsTrigger value="projects">Project Overview</TabsTrigger>
           <TabsTrigger value="payroll">Payroll Overview</TabsTrigger>
@@ -521,6 +592,61 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
                     </div>
                   );
                 })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="onboarding" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Employee Onboarding</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {employees.filter(emp => emp.onboarding_status !== 'completed').map(employee => (
+                  <div key={employee.id} className="p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-blue-600">{employee.user.first_name.charAt(0)}{employee.user.last_name.charAt(0)}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{employee.user.first_name} {employee.user.last_name}</p>
+                            <p className="text-sm text-gray-600">{employee.position}</p>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <p>Hired: {new Date(employee.hire_date).toLocaleDateString()}</p>
+                          <p>Status: <span className={`capitalize ${employee.onboarding_status === 'pending' ? 'text-yellow-600' : employee.onboarding_status === 'in_progress' ? 'text-blue-600' : 'text-green-600'}`}>{employee.onboarding_status.replace('_', ' ')}</span></p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {employee.onboarding_status === 'pending' && (
+                          <Button
+                            size="sm"
+                            onClick={() => updateOnboardingStatus(employee.id, 'in_progress')}
+                          >
+                            Start Onboarding
+                          </Button>
+                        )}
+                        {employee.onboarding_status === 'in_progress' && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => updateOnboardingStatus(employee.id, 'completed')}
+                          >
+                            Complete Onboarding
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {employees.filter(emp => emp.onboarding_status !== 'completed').length === 0 && (
+                  <p className="text-center text-gray-500 py-8">All employees are fully onboarded!</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -633,6 +759,23 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
                         }>
                           {record.status}
                         </Badge>
+                        {record.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            onClick={() => processPayroll(record.id, 'processed')}
+                          >
+                            Process
+                          </Button>
+                        )}
+                        {record.status === 'processed' && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => processPayroll(record.id, 'paid')}
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -645,7 +788,7 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
 
       {/* Employee Details Dialog */}
       <Dialog open={isEmployeeDetailsOpen} onOpenChange={setIsEmployeeDetailsOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-2xl max-h-[65vh] overflow-y-auto w-full sm:max-w-2xl mx-4 my-8">
           <DialogHeader>
             <DialogTitle>Employee Details - {selectedEmployee?.user.first_name} {selectedEmployee?.user.last_name}</DialogTitle>
           </DialogHeader>

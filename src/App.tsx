@@ -13,10 +13,14 @@ import { Performance } from './components/Performance';
 import { Training } from './components/Training';
 import { Settings } from './components/Settings';
 import { EmployeeManagement } from './components/EmployeeManagement';
+import { LeaveManagement } from './components/LeaveManagement';
+import { Reporting } from './components/Reporting';
 import { JobApplication } from './components/JobApplication';
+import { SalaryCalculator } from './components/SalaryCalculator';
 import { Login } from './components/Login';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Toaster } from './components/ui/sonner';
+import { ThemeProvider } from 'next-themes';
 
 export type UserRole = 'admin' | 'manager' | 'employee';
 
@@ -27,6 +31,7 @@ export interface User {
   role: UserRole;
   department: string;
   avatar?: string;
+  employee_id?: number;
 }
 
 function AppContent() {
@@ -49,6 +54,14 @@ function AppContent() {
         );
       case 'attendance':
         return <Attendance user={user} />;
+      case 'leave-management':
+        return <LeaveManagement user={user} />;
+      case 'reporting':
+        return (
+          <ProtectedRoute requiredRoles={['admin', 'manager']}>
+            <Reporting user={user} />
+          </ProtectedRoute>
+        );
       case 'payroll':
         return (
           <ProtectedRoute requiredRoles={['admin', 'manager']}>
@@ -83,6 +96,12 @@ function AppContent() {
         );
       case 'job-application':
         return <JobApplication />;
+      case 'salary-calculator':
+        return (
+          <ProtectedRoute requiredRoles={['admin', 'manager']}>
+            <SalaryCalculator user={user} />
+          </ProtectedRoute>
+        );
       case 'settings':
         return <Settings user={user} setUser={updateUser} />;
       default:
@@ -106,9 +125,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-      <Toaster position="top-right" />
-    </AuthProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <AuthProvider>
+        <AppContent />
+        <Toaster position="top-right" />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

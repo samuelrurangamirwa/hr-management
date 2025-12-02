@@ -17,6 +17,7 @@ interface SettingsProps {
 
 export function Settings({ user, setUser }: SettingsProps) {
   const roles: UserRole[] = ['admin', 'manager', 'employee'];
+  const [activeTab, setActiveTab] = useState('profile');
   const [profileForm, setProfileForm] = useState({
     name: user.name,
     email: user.email,
@@ -203,14 +204,14 @@ export function Settings({ user, setUser }: SettingsProps) {
         </Card>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="role">Role & Permissions</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile">
+        <TabsContent value="profile" key="profile">
           <Card>
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
@@ -218,7 +219,7 @@ export function Settings({ user, setUser }: SettingsProps) {
             <CardContent className="space-y-6">
               <div className="flex items-center gap-6">
                 <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600">{user.name.charAt(0)}</span>
+                  <span className="text-blue-600">{user.name ? user.name.charAt(0) : 'U'}</span>
                 </div>
                 <Button variant="outline" onClick={() => toast.info('Photo upload coming soon')}>Change Photo</Button>
               </div>
@@ -269,7 +270,7 @@ export function Settings({ user, setUser }: SettingsProps) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="role">
+        <TabsContent value="role" key="role">
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -365,7 +366,7 @@ export function Settings({ user, setUser }: SettingsProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="notifications">
+        <TabsContent value="notifications" key="notifications">
           <Card>
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -24,6 +25,13 @@ class Employee(models.Model):
     address = models.TextField(blank=True)
     emergency_contact = models.CharField(max_length=100, blank=True)
     emergency_phone = models.CharField(max_length=20, blank=True)
+    onboarding_status = models.CharField(max_length=20, choices=[
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('rejected', 'Rejected'),
+    ], default='pending')
+    onboarding_completed_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.position}"
@@ -47,20 +55,87 @@ class Attendance(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.date}"
 
+class Deduction(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='deductions')
+    name = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    type = models.CharField(max_length=50, choices=[
+        ('tax', 'Tax'),
+        ('insurance', 'Insurance'),
+        ('retirement', 'Retirement'),
+        ('loan', 'Loan'),
+        ('other', 'Other'),
+    ], default='other')
+    is_recurring = models.BooleanField(default=True)
+    effective_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    created_date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.employee} - {self.name}: ${self.amount}"
+
 class Payroll(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='payrolls')
     period_start = models.DateField()
     period_end = models.DateField()
     base_salary = models.DecimalField(max_digits=10, decimal_places=2)
+    overtime_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    overtime_rate = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    net_salary = models.DecimalField(max_digits=10, decimal_places=2)
+    allowances = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    gross_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    net_salary = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
         ('processed', 'Processed'),
         ('paid', 'Paid'),
     ], default='pending')
     processed_date = models.DateTimeField(null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
+
+    def calculate_gross_salary(self):
+        """Calculate gross salary including overtime and allowances"""
+        from decimal import Decimal
+
+        # Ensure all values are Decimal for consistent arithmetic
+        overtime_hours = Decimal(str(self.overtime_hours))
+        overtime_rate = Decimal(str(self.overtime_rate))
+        bonus = Decimal(str(self.bonus))
+        allowances = Decimal(str(self.allowances))
+
+        overtime_pay = overtime_hours * overtime_rate
+        self.gross_salary = self.base_salary + overtime_pay + bonus + allowances
+        return self.gross_salary
+
+    def calculate_deductions(self):
+        """Calculate total deductions for this payroll period"""
+        from django.utils import timezone
+        from decimal import Decimal
+
+        current_date = timezone.now().date()
+
+        # Get active deductions for this employee
+        active_deductions = Deduction.objects.filter(
+            employee=self.employee,
+            effective_date__lte=current_date,
+            is_recurring=True
+        ).filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gte=current_date)
+        )
+
+        # Calculate monthly deductions (assuming bi-weekly payroll)
+        monthly_deductions = sum(Decimal(str(deduction.amount)) for deduction in active_deductions)
+
+        # For simplicity, we'll use half of monthly deductions for bi-weekly payroll
+        # In a real system, you'd have more sophisticated calculation logic
+        self.total_deductions = monthly_deductions / Decimal('2')
+        return self.total_deductions
+
+    def calculate_net_salary(self):
+        """Calculate net salary after deductions"""
+        self.net_salary = self.gross_salary - self.total_deductions
+        return self.net_salary
 
     def __str__(self):
         return f"{self.employee} - {self.period_start} to {self.period_end}"
@@ -195,6 +270,42 @@ class Project(models.Model):
     ], default='medium')
     progress = models.PositiveIntegerField(default=0, validators=[MaxValueValidator(100)])
 
+    def update_status_based_on_tasks(self):
+        """Update project status based on task completion status with weighted progress"""
+        tasks = self.tasks.all()
+        if not tasks.exists():
+            # No tasks - keep current status or set to planning
+            if self.status not in ['planning', 'completed']:
+                self.status = 'planning'
+            self.progress = 0
+        else:
+            # Calculate weighted progress based on task statuses
+            total_tasks = tasks.count()
+            progress_sum = 0
+
+            for task in tasks:
+                if task.status == 'completed':
+                    progress_sum += 100
+                elif task.status == 'review':
+                    progress_sum += 75
+                elif task.status == 'in_progress':
+                    progress_sum += 50
+                elif task.status == 'todo':
+                    progress_sum += 0
+
+            # Calculate average completion percentage
+            self.progress = int(progress_sum / total_tasks)
+
+            # Determine project status
+            if self.progress == 100:
+                self.status = 'completed'
+            elif tasks.filter(status__in=['in_progress', 'review']).exists():
+                self.status = 'active'
+            else:
+                self.status = 'planning'
+
+        self.save()
+
     def __str__(self):
         return self.name
 
@@ -231,6 +342,27 @@ class Task(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
     completed_date = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        # Update completed_date when status changes to completed
+        if self.status == 'completed' and not self.completed_date:
+            self.completed_date = timezone.now()
+        elif self.status != 'completed':
+            self.completed_date = None
+
+        super().save(*args, **kwargs)
+
+        # Update project status after saving task
+        if self.project:
+            self.project.update_status_based_on_tasks()
+
+    def delete(self, *args, **kwargs):
+        project = self.project
+        super().delete(*args, **kwargs)
+
+        # Update project status after deleting task
+        if project:
+            project.update_status_based_on_tasks()
+
     def __str__(self):
         return self.title
 
@@ -243,6 +375,8 @@ class PerformanceReview(models.Model):
     strengths = models.TextField(blank=True)
     areas_for_improvement = models.TextField(blank=True)
     goals = models.TextField(blank=True)
+    employee_feedback = models.TextField(blank=True)
+    reviewer_feedback = models.TextField(blank=True)
     review_date = models.DateField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=[
         ('draft', 'Draft'),
@@ -323,6 +457,44 @@ class TaxRecord(models.Model):
 
     def __str__(self):
         return f"{self.employee} - Tax Year {self.tax_year}"
+
+class LeaveRequest(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_requests')
+    leave_type = models.CharField(max_length=50, choices=[
+        ('annual', 'Annual Leave'),
+        ('sick', 'Sick Leave'),
+        ('maternity', 'Maternity Leave'),
+        ('paternity', 'Paternity Leave'),
+        ('emergency', 'Emergency Leave'),
+        ('other', 'Other'),
+    ])
+    start_date = models.DateField()
+    end_date = models.DateField()
+    days_requested = models.PositiveIntegerField()
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=[
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
+    ], default='pending')
+    submitted_date = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_leaves')
+    approved_date = models.DateTimeField(null=True, blank=True)
+    comments = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.employee} - {self.leave_type} ({self.start_date} to {self.end_date})"
+
+class PaySlip(models.Model):
+    payroll = models.OneToOneField(Payroll, on_delete=models.CASCADE, related_name='pay_slip')
+    pdf_file = models.FileField(upload_to='pay_slips/', null=True, blank=True)
+    generated_date = models.DateTimeField(auto_now_add=True)
+    is_downloaded = models.BooleanField(default=False)
+    download_count = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"Pay Slip - {self.payroll.employee} - {self.payroll.period_start}"
 
 class Budget(models.Model):
     department = models.CharField(max_length=100)

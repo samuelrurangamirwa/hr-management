@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: hr-backend
+    runtime: python3
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python scripts/setup_db.py"
+    startCommand: "gunicorn hr_backend.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: RENDER
+        value: true
+      - key: DJANGO_SETTINGS_MODULE
+        value: hr_backend.settings
+      - key: DEBUG
+        value: false

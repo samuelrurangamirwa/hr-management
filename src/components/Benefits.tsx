@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 
 interface BenefitsProps {
@@ -57,7 +58,10 @@ export function Benefits({ user }: BenefitsProps) {
   }, []);
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [expenseDetailDialogOpen, setExpenseDetailDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [expenseForm, setExpenseForm] = useState({
+    title: '',
     category: '',
     amount: '',
     description: '',
@@ -66,7 +70,7 @@ export function Benefits({ user }: BenefitsProps) {
   const handleSubmitExpense = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!expenseForm.category || !expenseForm.amount || !expenseForm.description) {
+    if (!expenseForm.title || !expenseForm.category || !expenseForm.amount || !expenseForm.description) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -80,7 +84,7 @@ export function Benefits({ user }: BenefitsProps) {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          title: expenseForm.description,
+          title: expenseForm.title,
           description: expenseForm.description,
           amount: parseFloat(expenseForm.amount),
           category: expenseForm.category,
@@ -90,7 +94,7 @@ export function Benefits({ user }: BenefitsProps) {
       if (response.ok) {
         const newExpense = await response.json();
         setExpenses([newExpense, ...expenses]);
-        setExpenseForm({ category: '', amount: '', description: '' });
+        setExpenseForm({ title: '', category: '', amount: '', description: '' });
         setExpenseDialogOpen(false);
         toast.success('Expense claim submitted successfully!');
       } else {
@@ -194,6 +198,11 @@ export function Benefits({ user }: BenefitsProps) {
     }
   };
 
+  const handleViewExpenseDetail = (expense: any) => {
+    setSelectedExpense(expense);
+    setExpenseDetailDialogOpen(true);
+  };
+
   const stats = [
     { label: 'Total Benefits', value: benefits.length.toString(), icon: Gift, color: 'text-purple-600', bg: 'bg-purple-50' },
     { label: 'Active Benefits', value: benefits.filter(b => b.is_active).length.toString(), icon: Check, color: 'text-green-600', bg: 'bg-green-50' },
@@ -234,13 +243,28 @@ export function Benefits({ user }: BenefitsProps) {
             </DialogHeader>
             <form onSubmit={handleSubmitExpense} className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>Title</Label>
                 <Input
-                  placeholder="e.g., Travel, Equipment"
-                  value={expenseForm.category}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                  placeholder="Brief title for the expense"
+                  value={expenseForm.title}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={expenseForm.category} onValueChange={(value: string) => setExpenseForm({...expenseForm, category: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="travel">Travel</SelectItem>
+                    <SelectItem value="equipment">Equipment</SelectItem>
+                    <SelectItem value="training">Training</SelectItem>
+                    <SelectItem value="medical">Medical</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Amount</Label>
@@ -268,6 +292,54 @@ export function Benefits({ user }: BenefitsProps) {
               </div>
               <Button type="submit" className="w-full">Submit Claim</Button>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Expense Detail Dialog */}
+        <Dialog open={expenseDetailDialogOpen} onOpenChange={setExpenseDetailDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Expense Claim Details</DialogTitle>
+            </DialogHeader>
+            {selectedExpense && (
+              <div className="py-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="font-semibold mb-4">Claim Information</h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Title:</strong> {selectedExpense.title}</p>
+                      <p><strong>Employee:</strong> {selectedExpense.employee_name}</p>
+                      <p><strong>Category:</strong> {selectedExpense.category}</p>
+                      <p><strong>Amount:</strong> ${selectedExpense.amount.toLocaleString()}</p>
+                      <p><strong>Status:</strong> {getStatusBadge(selectedExpense.status)}</p>
+                      <p><strong>Submitted Date:</strong> {new Date(selectedExpense.submitted_date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-4">Additional Details</h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Description:</strong></p>
+                      <p className="text-gray-700">{selectedExpense.description}</p>
+                      {selectedExpense.approved_by_name && (
+                        <p><strong>Approved By:</strong> {selectedExpense.approved_by_name}</p>
+                      )}
+                      {selectedExpense.approved_date && (
+                        <p><strong>Approved Date:</strong> {new Date(selectedExpense.approved_date).toLocaleDateString()}</p>
+                      )}
+                      {selectedExpense.comments && (
+                        <>
+                          <p><strong>Comments:</strong></p>
+                          <p className="text-gray-700">{selectedExpense.comments}</p>
+                        </>
+                      )}
+                      {selectedExpense.receipt && (
+                        <p><strong>Receipt:</strong> <a href={selectedExpense.receipt} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Receipt</a></p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -399,7 +471,7 @@ export function Benefits({ user }: BenefitsProps) {
                                 </Button>
                               </>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => toast.info('Expense details coming soon')}>View</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleViewExpenseDetail(expense)}>View</Button>
                           </div>
                         </td>
                       </tr>

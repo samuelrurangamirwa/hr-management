@@ -8,7 +8,7 @@ import { DollarSign, Download, Send, TrendingUp, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface PayrollProps {
   user: User;
@@ -70,11 +70,11 @@ export function Payroll({ user }: PayrollProps) {
   }, [user]);
 
   const payrollSummary = {
-    totalPayroll: payrollData.reduce((sum, p) => sum + p.net_salary, 0),
+    totalPayroll: payrollData.reduce((sum, p) => sum + (p.net_salary || 0), 0),
     totalEmployees: payrollData.length,
-    avgSalary: payrollData.length > 0 ? payrollData.reduce((sum, p) => sum + p.net_salary, 0) / payrollData.length : 0,
-    totalDeductions: payrollData.reduce((sum, p) => sum + p.deductions, 0),
-    netPayroll: payrollData.reduce((sum, p) => sum + p.net_salary, 0),
+    avgSalary: payrollData.length > 0 ? payrollData.reduce((sum, p) => sum + (p.net_salary || 0), 0) / payrollData.length : 0,
+    totalDeductions: payrollData.reduce((sum, p) => sum + (p.total_deductions || 0), 0),
+    netPayroll: payrollData.reduce((sum, p) => sum + (p.net_salary || 0), 0),
   };
 
   const employees = payrollData.map(payroll => ({
@@ -84,15 +84,15 @@ export function Payroll({ user }: PayrollProps) {
     position: payroll.position || 'Unknown',
     baseSalary: payroll.base_salary,
     bonus: payroll.bonus,
-    deductions: payroll.deductions,
+    deductions: payroll.total_deductions || 0,
     netSalary: payroll.net_salary,
     status: payroll.status
   }));
 
   const stats = [
     { label: 'Total Payroll', value: `$${payrollSummary.totalPayroll.toLocaleString()}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Employees', value: payrollSummary.totalEmployees, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Avg Salary', value: `$${payrollSummary.avgSalary}`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Employees', value: payrollSummary.totalEmployees.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Avg Salary', value: `$${Math.round(payrollSummary.avgSalary).toLocaleString()}`, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
     { label: 'Total Deductions', value: `$${payrollSummary.totalDeductions.toLocaleString()}`, icon: DollarSign, color: 'text-orange-600', bg: 'bg-orange-50' },
   ];
 
@@ -203,10 +203,10 @@ export function Payroll({ user }: PayrollProps) {
                           </div>
                         </td>
                         <td className="py-3 px-4">{employee.department}</td>
-                        <td className="py-3 px-4">${employee.baseSalary.toLocaleString()}</td>
-                        <td className="py-3 px-4 text-green-600">+${employee.bonus.toLocaleString()}</td>
-                        <td className="py-3 px-4 text-red-600">-${employee.deductions.toLocaleString()}</td>
-                        <td className="py-3 px-4">${employee.netSalary.toLocaleString()}</td>
+                        <td className="py-3 px-4">${(employee.baseSalary || 0).toLocaleString()}</td>
+                        <td className="py-3 px-4 text-green-600">+${(employee.bonus || 0).toLocaleString()}</td>
+                        <td className="py-3 px-4 text-red-600">-${(employee.deductions || 0).toLocaleString()}</td>
+                        <td className="py-3 px-4">${(employee.netSalary || 0).toLocaleString()}</td>
                         <td className="py-3 px-4">{getStatusBadge(employee.status)}</td>
                         <td className="py-3 px-4">
                           <Dialog>
@@ -242,15 +242,15 @@ export function Payroll({ user }: PayrollProps) {
                                   <div className="space-y-3">
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Base Salary</span>
-                                      <span>${employee.baseSalary.toLocaleString()}</span>
+                                      <span>${(employee.baseSalary || 0).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Performance Bonus</span>
-                                      <span className="text-green-600">+${employee.bonus.toLocaleString()}</span>
+                                      <span className="text-green-600">+${(employee.bonus || 0).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between pt-3 border-t">
                                       <span>Gross Salary</span>
-                                      <span>${(employee.baseSalary + employee.bonus).toLocaleString()}</span>
+                                      <span>${((employee.baseSalary || 0) + (employee.bonus || 0)).toLocaleString()}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -260,19 +260,19 @@ export function Payroll({ user }: PayrollProps) {
                                   <div className="space-y-3">
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Tax (15%)</span>
-                                      <span className="text-red-600">-${(employee.deductions * 0.6).toFixed(0)}</span>
+                                      <span className="text-red-600">-${((employee.deductions || 0) * 0.6).toFixed(0)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Insurance</span>
-                                      <span className="text-red-600">-${(employee.deductions * 0.25).toFixed(0)}</span>
+                                      <span className="text-red-600">-${((employee.deductions || 0) * 0.25).toFixed(0)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Retirement Fund</span>
-                                      <span className="text-red-600">-${(employee.deductions * 0.15).toFixed(0)}</span>
+                                      <span className="text-red-600">-${((employee.deductions || 0) * 0.15).toFixed(0)}</span>
                                     </div>
                                     <div className="flex justify-between pt-3 border-t">
                                       <span>Total Deductions</span>
-                                      <span className="text-red-600">-${employee.deductions.toLocaleString()}</span>
+                                      <span className="text-red-600">-${(employee.deductions || 0).toLocaleString()}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -280,7 +280,7 @@ export function Payroll({ user }: PayrollProps) {
                                 <div className="border-t-2 border-gray-300 pt-4">
                                   <div className="flex justify-between">
                                     <span>Net Salary</span>
-                                    <span className="text-green-600">${employee.netSalary.toLocaleString()}</span>
+                                    <span className="text-green-600">${(employee.netSalary || 0).toLocaleString()}</span>
                                   </div>
                                 </div>
 
@@ -329,7 +329,7 @@ export function Payroll({ user }: PayrollProps) {
                         <p className="text-sm text-gray-600 mt-1">Period: {new Date(payslip.period_start).toLocaleDateString()} - {new Date(payslip.period_end).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right">
-                        <p>${payslip.net_salary.toLocaleString()}</p>
+                        <p>${(payslip.net_salary || 0).toLocaleString()}</p>
                         {getStatusBadge(payslip.status)}
                       </div>
                     </div>

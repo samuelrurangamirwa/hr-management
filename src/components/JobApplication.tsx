@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Upload, Briefcase, MapPin, DollarSign } from 'lucide-react';
 
 interface JobPosting {
@@ -93,8 +93,10 @@ export function JobApplication({ jobId }: JobApplicationProps) {
       formData.append('phone', applicationData.phone);
       formData.append('experience_years', applicationData.experience_years.toString());
       formData.append('current_position', applicationData.current_position);
-      formData.append('expected_salary', applicationData.expected_salary);
-      formData.append('stage', 'Applied');
+      if (applicationData.expected_salary) {
+        formData.append('expected_salary', parseFloat(applicationData.expected_salary).toString());
+      }
+      formData.append('status', 'applied');
 
       if (applicationData.resume) {
         formData.append('resume', applicationData.resume);

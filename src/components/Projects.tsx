@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Progress } from './ui/progress';
 import { toast } from 'sonner';
 
 interface ProjectsProps {
@@ -31,127 +30,104 @@ interface Project {
 }
 
 export function Projects({ user }: ProjectsProps) {
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: 1,
-      name: 'HR System Redesign',
-      description: 'Complete overhaul of the HR management system',
-      status: 'in-progress',
-      progress: 65,
-      startDate: '2024-04-01',
-      endDate: '2024-08-31',
-      budget: 150000,
-      spent: 97500,
-      team: ['John Doe', 'Jane Smith', 'Michael Chen'],
-      priority: 'high',
-      department: 'Engineering'
-    },
-    {
-      id: 2,
-      name: 'Employee Onboarding Portal',
-      description: 'Digital platform for new employee onboarding',
-      status: 'in-progress',
-      progress: 45,
-      startDate: '2024-05-15',
-      endDate: '2024-09-15',
-      budget: 80000,
-      spent: 36000,
-      team: ['Sarah Johnson', 'David Kim'],
-      priority: 'medium',
-      department: 'HR'
-    },
-    {
-      id: 3,
-      name: 'Performance Review System',
-      description: 'Automated performance evaluation platform',
-      status: 'completed',
-      progress: 100,
-      startDate: '2024-01-10',
-      endDate: '2024-05-30',
-      budget: 120000,
-      spent: 115000,
-      team: ['Robert Brown', 'Lisa Anderson', 'Emily Rodriguez'],
-      priority: 'high',
-      department: 'HR'
-    },
-    {
-      id: 4,
-      name: 'Training Platform Integration',
-      description: 'Integration with external LMS system',
-      status: 'planning',
-      progress: 15,
-      startDate: '2024-07-01',
-      endDate: '2024-12-31',
-      budget: 200000,
-      spent: 30000,
-      team: ['Michael Chen', 'Sarah Johnson'],
-      priority: 'low',
-      department: 'Training'
-    },
-  ]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/projects/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProjects(data);
+        } else if (response.status === 401) {
+          toast.error('Authentication required. Please log in again.');
+        } else {
+          toast.error('Failed to load projects');
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        toast.error('Failed to load projects');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, []);
 
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [projectDetailsDialogOpen, setProjectDetailsDialogOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
   const [projectForm, setProjectForm] = useState({
     name: '',
     description: '',
-    startDate: '',
-    endDate: '',
+    start_date: '',
+    end_date: '',
     budget: '',
-    department: '',
   });
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!projectForm.name || !projectForm.description || !projectForm.startDate || !projectForm.endDate || !projectForm.budget || !projectForm.department) {
+
+    if (!projectForm.name || !projectForm.description || !projectForm.start_date) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    const newProject: Project = {
-      id: projects.length + 1,
-      name: projectForm.name,
-      description: projectForm.description,
-      status: 'planning',
-      progress: 0,
-      startDate: projectForm.startDate,
-      endDate: projectForm.endDate,
-      budget: parseFloat(projectForm.budget),
-      spent: 0,
-      team: [user.name],
-      priority: 'medium',
-      department: projectForm.department,
-    };
+    try {
+      const token = localStorage.getItem('token');
+      const projectData: any = {
+        name: projectForm.name,
+        description: projectForm.description,
+        start_date: projectForm.start_date,
+        budget: projectForm.budget ? parseFloat(projectForm.budget) : null,
+      };
 
-    setProjects([newProject, ...projects]);
-    setProjectForm({ name: '', description: '', startDate: '', endDate: '', budget: '', department: '' });
-    setProjectDialogOpen(false);
-    toast.success('Project created successfully!');
+      if (projectForm.end_date) {
+        projectData.end_date = projectForm.end_date;
+      }
+
+      const response = await fetch('/api/projects/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(projectData),
+      });
+
+      if (response.ok) {
+        const newProject = await response.json();
+        setProjects([newProject, ...projects]);
+        setProjectForm({ name: '', description: '', start_date: '', end_date: '', budget: '' });
+        setProjectDialogOpen(false);
+        toast.success('Project created successfully!');
+      } else if (response.status === 401) {
+        toast.error('Authentication required. Please log in again.');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.detail || 'Failed to create project');
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      toast.error('Failed to create project');
+    }
   };
 
-  const handleUpdateStatus = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId);
-    if (!project) return;
 
-    let newStatus = project.status;
-    switch (project.status) {
-      case 'planning':
-        newStatus = 'in-progress';
-        break;
-      case 'in-progress':
-        newStatus = 'completed';
-        break;
-      case 'completed':
-        newStatus = 'planning';
-        break;
-    }
-
-    setProjects(projects.map(p =>
-      p.id === projectId
-        ? { ...p, status: newStatus, progress: newStatus === 'completed' ? 100 : p.progress }
-        : p
-    ));
-    toast.success(`Project status updated to ${newStatus}`);
+  const handleViewProjectDetails = (project: any) => {
+    setSelectedProject(project);
+    setProjectDetailsDialogOpen(true);
   };
 
   const stats = [
@@ -184,6 +160,10 @@ export function Projects({ user }: ProjectsProps) {
     return <Badge className={variant.className}>{variant.label}</Badge>;
   };
 
+  if (loading) {
+    return <div className="p-8">Loading projects...</div>;
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -193,12 +173,16 @@ export function Projects({ user }: ProjectsProps) {
         </div>
         <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button
+              className="gap-2"
+              disabled={user.role !== 'admin' && user.role !== 'manager'}
+              title={user.role !== 'admin' && user.role !== 'manager' ? 'Only managers and admins can create projects' : ''}
+            >
               <Plus className="w-4 h-4" />
               New Project
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[75vh] overflow-y-auto w-full sm:max-w-2xl mx-4 my-8">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
             </DialogHeader>
@@ -227,41 +211,29 @@ export function Projects({ user }: ProjectsProps) {
                   <Label>Start Date</Label>
                   <Input
                     type="date"
-                    value={projectForm.startDate}
-                    onChange={(e) => setProjectForm({ ...projectForm, startDate: e.target.value })}
+                    value={projectForm.start_date}
+                    onChange={(e) => setProjectForm({ ...projectForm, start_date: e.target.value })}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>End Date</Label>
+                  <Label>End Date (Optional)</Label>
                   <Input
                     type="date"
-                    value={projectForm.endDate}
-                    onChange={(e) => setProjectForm({ ...projectForm, endDate: e.target.value })}
-                    required
+                    value={projectForm.end_date}
+                    onChange={(e) => setProjectForm({ ...projectForm, end_date: e.target.value })}
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Budget</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={projectForm.budget}
-                    onChange={(e) => setProjectForm({ ...projectForm, budget: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Department</Label>
-                  <Input
-                    placeholder="e.g., Engineering"
-                    value={projectForm.department}
-                    onChange={(e) => setProjectForm({ ...projectForm, department: e.target.value })}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Budget</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={projectForm.budget}
+                  onChange={(e) => setProjectForm({ ...projectForm, budget: e.target.value })}
+                  required
+                />
               </div>
               <Button type="submit" className="w-full">Create Project</Button>
             </form>
@@ -310,67 +282,206 @@ export function Projects({ user }: ProjectsProps) {
             <CardContent className="space-y-4">
               {/* Progress */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Progress</span>
-                  <span className="text-sm">{project.progress}%</span>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Progress</span>
+                  <span>{project.progress}%</span>
                 </div>
-                <Progress value={project.progress} className="h-2" />
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full"
+                    style={{ width: `${project.progress}%` }}
+                  ></div>
+                </div>
               </div>
 
               {/* Project Details */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">Department</p>
-                  <p>{project.department}</p>
+                  <p className="text-gray-500">Manager</p>
+                  <p>{project.manager_name || 'Not assigned'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Team Size</p>
-                  <p>{project.team.length} members</p>
+                  <p>{project.team_members?.length || 0} members</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Timeline</p>
-                  <p>{new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}</p>
+                  <p>{new Date(project.start_date).toLocaleDateString()} - {project.end_date ? new Date(project.end_date).toLocaleDateString() : 'Ongoing'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Budget</p>
-                  <p>${project.spent.toLocaleString()} / ${project.budget.toLocaleString()}</p>
+                  <p>${project.budget?.toLocaleString() || '0'}</p>
                 </div>
-              </div>
-
-              {/* Budget Progress */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Budget Utilization</span>
-                  <span className="text-sm">{((project.spent / project.budget) * 100).toFixed(0)}%</span>
-                </div>
-                <Progress value={(project.spent / project.budget) * 100} className="h-2" />
               </div>
 
               {/* Team Members */}
-              <div>
-                <p className="text-sm text-gray-600 mb-2">Team Members</p>
-                <div className="flex -space-x-2">
-                  {project.team.map((member, index) => (
-                    <div
-                      key={index}
-                      className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center"
-                      title={member}
-                    >
-                      <span className="text-xs text-blue-600">{member.charAt(0)}</span>
-                    </div>
-                  ))}
+              {project.team_members && project.team_members.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Team Members</p>
+                  <div className="flex -space-x-2">
+                    {project.team_members.map((member: any, index: number) => (
+                      <div
+                        key={index}
+                        className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center"
+                        title={member.employee_name}
+                      >
+                        <span className="text-xs text-blue-600">{member.employee_name?.charAt(0) || '?'}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => toast.info('Project details coming soon')}>View Details</Button>
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => handleUpdateStatus(project.id)}>Update Status</Button>
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => handleViewProjectDetails(project)}>View Details</Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Project Details Dialog */}
+      <Dialog open={projectDetailsDialogOpen} onOpenChange={setProjectDetailsDialogOpen}>
+        <DialogContent className="max-w-2xl overflow-y-auto w-full sm:max-w-2xl mx-4 my-8" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+          <DialogHeader>
+            <DialogTitle>Project Details - {selectedProject?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedProject && (
+            <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {/* Project Overview */}
+              <div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Status</Label>
+                    <div className="mt-1">
+                      {getStatusBadge(selectedProject.status)}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Auto-updated based on tasks</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Priority</Label>
+                    <div className="mt-1">
+                      {getPriorityBadge(selectedProject.priority)}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-gray-500">Description</Label>
+                  <p className="mt-1 text-gray-700">{selectedProject.description}</p>
+                </div>
+              </div>
+
+              {/* Progress Section */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Progress</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Average Task Completion</span>
+                    <span>{selectedProject.progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                      style={{ width: `${selectedProject.progress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Calculated as average of task completion levels:<br/>
+                    Todo (0%) → In Progress (50%) → Review (75%) → Completed (100%)
+                  </p>
+                </div>
+              </div>
+
+              {/* Project Details */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Project Information</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Manager</Label>
+                      <p className="mt-1">{selectedProject.manager_name || 'Not assigned'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Start Date</Label>
+                      <p className="mt-1">{new Date(selectedProject.start_date).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Budget</Label>
+                      <p className="mt-1">${selectedProject.budget?.toLocaleString() || '0'}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Team Size</Label>
+                      <p className="mt-1">{selectedProject.team_members?.length || 0} members</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">End Date</Label>
+                      <p className="mt-1">{selectedProject.end_date ? new Date(selectedProject.end_date).toLocaleDateString() : 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Project ID</Label>
+                      <p className="mt-1">#{selectedProject.id}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Team Members */}
+              {selectedProject.team_members && selectedProject.team_members.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Team Members</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {selectedProject.team_members.map((member: any, index: number) => (
+                      <div key={index} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <span className="text-blue-600 font-medium">
+                            {member.employee_name?.charAt(0) || '?'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium">{member.employee_name}</p>
+                          <p className="text-sm text-gray-500">{member.role || 'Team Member'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Project Tasks Summary */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Tasks Summary</h3>
+                <div className="grid grid-cols-4 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">{selectedProject.tasks?.length || 0}</p>
+                    <p className="text-sm text-gray-600">Total Tasks</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">
+                      {selectedProject.tasks?.filter((t: any) => t.status === 'completed').length || 0}
+                    </p>
+                    <p className="text-sm text-gray-600">Completed</p>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                    <p className="text-2xl font-bold text-orange-600">
+                      {selectedProject.tasks?.filter((t: any) => t.status === 'in_progress').length || 0}
+                    </p>
+                    <p className="text-sm text-gray-600">In Progress</p>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg">
+                    <p className="text-2xl font-bold text-red-600">
+                      {selectedProject.tasks?.filter((t: any) => t.status === 'todo').length || 0}
+                    </p>
+                    <p className="text-sm text-gray-600">Pending</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

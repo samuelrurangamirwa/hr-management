@@ -12,12 +12,14 @@ import {
   Settings as SettingsIcon,
   Users,
   FileText,
-  LogOut
+  LogOut,
+  Calendar,
+  BarChart3
 } from 'lucide-react';
 import { User } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface SidebarProps {
   currentView: string;
@@ -33,13 +35,16 @@ export function Sidebar({ currentView, setCurrentView, user }: SidebarProps) {
     { id: 'recruitment', label: 'Recruitment', icon: UserPlus, roles: ['admin', 'manager'] },
     { id: 'employee-management', label: 'Employee Management', icon: Users, roles: ['admin', 'manager'] },
     { id: 'attendance', label: 'Attendance', icon: Fingerprint, roles: ['admin', 'manager', 'employee'] },
+    { id: 'leave-management', label: 'Leave Management', icon: Calendar, roles: ['admin', 'manager', 'employee'] },
     { id: 'payroll', label: 'Payroll', icon: DollarSign, roles: ['admin', 'manager'] },
+    { id: 'salary-calculator', label: 'Salary Calculator', icon: Calculator, roles: ['admin', 'manager'] },
     { id: 'tax-budget', label: 'Tax & Budget', icon: Calculator, roles: ['admin'] },
     { id: 'benefits', label: 'Benefits & Expenses', icon: Gift, roles: ['admin', 'manager', 'employee'] },
     { id: 'projects', label: 'Projects', icon: Briefcase, roles: ['admin', 'manager', 'employee'] },
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, roles: ['admin', 'manager', 'employee'] },
     { id: 'performance', label: 'Performance', icon: TrendingUp, roles: ['admin', 'manager'] },
     { id: 'training', label: 'Training', icon: GraduationCap, roles: ['admin', 'manager', 'employee'] },
+    { id: 'reporting', label: 'Reports & Analytics', icon: BarChart3, roles: ['admin', 'manager'] },
     { id: 'job-application', label: 'Apply for Jobs', icon: FileText, roles: ['admin', 'manager', 'employee'] },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, roles: ['admin', 'manager', 'employee'] },
   ];
