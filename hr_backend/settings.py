@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-c_8o+(jg$nug+4!*3ad@73-c^r&wr^1cst_n%ofr$jdy52id94
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'localhost:3000']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'localhost:3000', 'https://hr-management-pearl-gamma.vercel.app']
 
 
 # Application definition
