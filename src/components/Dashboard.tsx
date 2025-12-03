@@ -31,7 +31,7 @@ export function Dashboard({ user }: DashboardProps) {
     const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/dashboard/stats/', {
+        const response = await fetch('https://hr-management-nycf.onrender.com/api/dashboard/stats/', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },

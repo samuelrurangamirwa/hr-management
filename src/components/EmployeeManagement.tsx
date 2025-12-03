@@ -115,10 +115,10 @@ export function EmployeeManagement({ user }: EmployeeManagementProps) {
         const headers = { 'Authorization': `Bearer ${token}` };
 
         const [employeesRes, tasksRes, projectsRes, payrollRes] = await Promise.all([
-          fetch('/api/employees/', { headers }),
-          fetch('/api/tasks/', { headers }),
-          fetch('/api/projects/', { headers }),
-          fetch('/api/payroll/', { headers })
+          fetch('https://hr-management-nycf.onrender.com/api/employees/', { headers }),
+          fetch('https://hr-management-nycf.onrender.com/api/tasks/', { headers }),
+          fetch('https://hr-management-nycf.onrender.com/api/projects/', { headers }),
+          fetch('https://hr-management-nycf.onrender.com/api/payroll/', { headers })
         ]);
 
         if (employeesRes.ok) {
