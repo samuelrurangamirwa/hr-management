@@ -22,7 +22,7 @@ DATABASES = {
 
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = [
-    "https://your-frontend-domain.com",  # Replace with your actual frontend domain
+    "https://hr-management-pearl-gamma.vercel.app",  # Frontend domain
     "http://localhost:3000",  # For development
     "http://localhost:3001",  # For development
 ]

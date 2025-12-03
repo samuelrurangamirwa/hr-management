@@ -11,6 +11,6 @@ services:
       - key: RENDER
         value: true
       - key: DJANGO_SETTINGS_MODULE
-        value: hr_backend.settings
+        value: hr_backend.settings.production
       - key: DEBUG
         value: false
